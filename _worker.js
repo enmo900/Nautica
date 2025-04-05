@@ -1,4 +1,7 @@
 import { connect } from "cloudflare:sockets";
+import * as wasmModule from "./pkg/rust_wasm.js";
+
+// Init WASM secara eksplisit (karena `wasm-bindgen`)
 // import { createHash, createDecipheriv } from "node:crypto";
 // import { Buffer } from "node:buffer";
 
@@ -12,6 +15,7 @@ const zoneID = ""; // Ganti dengan Zone ID kalian (https://dash.cloudflare.com -
 let isApiReady = false;
 let proxyIP = "";
 let cachedProxyList = [];
+let wasmInitialized = false;
 
 // Constant
 const APP_DOMAIN = `${serviceName}.${rootDomain}`;
@@ -183,6 +187,12 @@ export default {
     try {
       const url = new URL(request.url);
       const upgradeHeader = request.headers.get("Upgrade");
+
+      // Initialize WASM
+      if (!wasmInitialized) {
+        await wasmModule.default(); // Init WASM
+        wasmInitialized = true;
+      }
 
       // Gateway check
       if (apiKey && apiEmail && accountID && zoneID) {
@@ -388,6 +398,11 @@ export default {
             }
           );
         }
+      } else if (url.pathname === "/link") {
+        const message = wasmModule.handle_link();
+        return new Response(message, {
+          headers: { "Content-Type": "text/plain" },
+        });
       }
 
       const targetReverseProxy = env.REVERSE_PROXY_TARGET || "example.com";
